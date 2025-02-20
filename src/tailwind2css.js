@@ -1,38 +1,47 @@
-// generateTailwindCss.js
+#!/usr/bin/env node
+/**
+ * @file tailwind2css.js
+ * @description A tool to convert Tailwind-like classes found in your project files into corresponding CSS rules.
+ *
+ * The script recursively scans files (HTML, TS, SCSS) within a target directory, extracts Tailwind-like
+ * class names, and generates a CSS file with rules for each unique class.
+ *
+ * Usage:
+ *   npx @ngnomads/tailwind2css <targetDirectory> <outputCssFile>
+ *
+ * Example:
+ *   npx @ngnomads/tailwind2css projects ./src/styles.css
+ */
 
 // ------------------------------
 // REQUIRED MODULES
 // ------------------------------
 const fs = require('fs');
 const path = require('path');
-const { sync: globSync } = require('glob');
+const {sync: globSync} = require('glob');
 
 // ------------------------------
 // CONFIGURATION
 // ------------------------------
-// Use project-specific target directory and output CSS file.
 const targetDir = process.argv[2] || 'projects';
-const outputCssFile =
-  process.argv[3] || './tailwind.css';
-
-// Include HTML, TS, and SCSS files.
+const outputCssFile = process.argv[3] || './tailwind.css';
 const pattern = path.join(targetDir, '**/*.{html,ts,scss}');
-// A Set to store unique Tailwind-like class names found in the project.
-const classSet = new Set();
+const classSet = new Set(); // Set to store unique Tailwind-like class names
 
 // ------------------------------
-// EXTRACTION FUNCTIONS
+// CLASS EXTRACTION FUNCTIONS
 // ------------------------------
 
 /**
- * Extracts classes from attributes (class, ng-class, [ngClass])
- * by splitting on whitespace or by extracting quoted strings.
+ * Extracts class names from attributes (class, ng-class, [ngClass]) in file content.
+ * @param {string} content - The content of the file to search.
  */
 function extractClasses(content) {
   const attrRegex = /(?:class|ng-class|\[ngClass\])\s*=\s*(?:"([^"]+)"|'([^']+)')/g;
   let match;
   while ((match = attrRegex.exec(content)) !== null) {
     const attrValue = match[1] || match[2];
+    // Check for object or array syntax, then extract string literals if needed.
     if (attrValue.trim().startsWith('{') || attrValue.trim().startsWith('[')) {
       const stringLiteralRegex = /["']([^"']+)["']/g;
       let innerMatch;
@@ -50,8 +59,8 @@ function extractClasses(content) {
 }
 
 /**
- * Uses a broad regex to capture many common Tailwind classes,
- * now including flex-wrap utilities.
+ * Uses a broad regular expression to capture common Tailwind-like classes.
+ * @param {string} content - The file content to search.
  */
 function extractPredefinedClasses(content) {
   const tailwindRegex =
@@ -63,15 +72,13 @@ function extractPredefinedClasses(content) {
 }
 
 /**
- * Extracts additional spacing classes (for margins, padding, and space utilities)
- * that might not be captured by the previous regex.
+ * Extracts additional spacing classes (margins, padding, and space utilities) from the file content.
+ * @param {string} content - The file content to search.
  */
 function extractAdditionalClasses(content) {
-  const marginRegex =
-    /\b(?:m|mx|my|ms|me|mt|mr|mb|ml)-(?:-?\d+(?:\.\d+)?|auto|px|\([^)]+\)|\[[^\]]+\])\b/g;
+  const marginRegex = /\b(?:m|mx|my|ms|me|mt|mr|mb|ml)-(?:-?\d+(?:\.\d+)?|auto|px|\([^)]+\)|\[[^\]]+\])\b/g;
   const spaceRegex = /\b(?:-?space-[xy]-(?:\d+|px|\([^)]+\)|\[[^\]]+\])|space-[xy]-reverse)\b/g;
-  const paddingRegex =
-    /\b(?:p|px|py|ps|pe|pt|pr|pb|pl)-(?:-?\d+(?:\.\d+)?|auto|px|\([^)]+\)|\[[^\]]+\])\b/g;
+  const paddingRegex = /\b(?:p|px|py|ps|pe|pt|pr|pb|pl)-(?:-?\d+(?:\.\d+)?|auto|px|\([^)]+\)|\[[^\]]+\])\b/g;
   let match;
   while ((match = marginRegex.exec(content)) !== null) {
     classSet.add(match[0]);
@@ -86,6 +93,7 @@ function extractAdditionalClasses(content) {
 
 /**
  * Extracts class names from SCSS @apply directives.
+ * @param {string} content - The SCSS file content to search.
  */
 function extractApplyClasses(content) {
   const applyRegex = /@apply\s+([^;]+);/g;
@@ -106,14 +114,15 @@ function extractApplyClasses(content) {
 
 /**
  * Escapes special characters in a class name for safe CSS selectors.
+ * @param {string} className - The class name to escape.
+ * @returns {string} The escaped class name.
  */
 function escapeClassName(className) {
   return className.replace(/[^a-zA-Z0-9_-]/g, (ch) => '\\' + ch);
 }
 
 /**
- * Fixed mapping for margin values.
- * Scale: 1 → 0.25rem, 2 → 0.5rem, 3 → 0.74rem, 4 → 1rem, …, 8 → 2rem.
+ * Mapping for fixed margin values.
  */
 const fixedMarginMapping = {
   0: '0px',
@@ -128,8 +137,7 @@ const fixedMarginMapping = {
 };
 
 /**
- * Fixed mapping for padding values.
- * For example, 0.5 → 0.125rem, 1 → 0.25rem, 1.5 → 0.375rem, etc.
+ * Mapping for fixed padding values.
  */
 const fixedPaddingMapping = {
   0: '0px',
@@ -169,7 +177,11 @@ const fixedPaddingMapping = {
 };
 
 /**
- * Generates a margin rule given a prefix and its corresponding CSS property.
+ * Generates a margin rule for a given class name.
+ * @param {string} className - The Tailwind-like class name.
+ * @param {string} prefix - The margin prefix (e.g., "m", "mt").
+ * @param {string} cssProp - The corresponding CSS property.
+ * @returns {string|null} The generated CSS rule, or null if not applicable.
  */
 function generateMarginRule(className, prefix, cssProp) {
   let re = new RegExp(`^(-?)${prefix}-(\\d+(?:\\.\\d+)?)$`);
@@ -210,7 +222,11 @@ function generateMarginRule(className, prefix, cssProp) {
 }
 
 /**
- * Generates a padding rule given a prefix and its corresponding CSS property.
+ * Generates a padding rule for a given class name.
+ * @param {string} className - The Tailwind-like class name.
+ * @param {string} prefix - The padding prefix (e.g., "p", "pt").
+ * @param {string} cssProp - The corresponding CSS property.
+ * @returns {string|null} The generated CSS rule, or null if not applicable.
  */
 function generatePaddingRule(className, prefix, cssProp) {
   let re = new RegExp(`^(-?)${prefix}-(\\d+(?:\\.\\d+)?)$`);
@@ -251,7 +267,10 @@ function generatePaddingRule(className, prefix, cssProp) {
 }
 
 /**
- * Generates a space utility rule for axis "x" or "y".
+ * Generates a space utility rule for the given axis ("x" or "y").
+ * @param {string} className - The Tailwind-like class name.
+ * @param {string} axis - The axis for the space utility ("x" or "y").
+ * @returns {string|null} The generated CSS rule, or null if not applicable.
  */
 function generateSpaceRule(className, axis) {
   let startProp, endProp;
@@ -295,11 +314,16 @@ function generateSpaceRule(className, axis) {
 }
 
 // ------------------------------
-// MAIN GENERATOR FUNCTION
+// MAIN CSS GENERATION FUNCTION
 // ------------------------------
 
+/**
+ * Generates the corresponding CSS rule for a given Tailwind-like class.
+ * @param {string} className - The class name to convert.
+ * @returns {string|null} The generated CSS rule, or null if no rule applies.
+ */
 function generateCssForClass(className) {
-  // -- FLEX UTILS --
+  // -- FLEX UTILITIES --
   if (className === 'flex') return `.flex { display: flex; }`;
   if (className === 'flex-auto') return `.flex-auto { flex: 1 1 auto; }`;
   if (className === 'flex-initial') return `.flex-initial { flex: 0 1 auto; }`;
@@ -315,12 +339,12 @@ function generateCssForClass(className) {
   match = className.match(/^flex-\[(.+?)\]$/);
   if (match) return `.${escapeClassName(className)} { flex: ${match[1].replace(/_/g, ' ')}; }`;
 
-  // -- FLEX WRAP UTILS --
+  // -- FLEX WRAP UTILITIES --
   if (className === 'flex-wrap') return `.flex-wrap { flex-wrap: wrap; }`;
   if (className === 'flex-nowrap') return `.flex-nowrap { flex-wrap: nowrap; }`;
   if (className === 'flex-wrap-reverse') return `.flex-wrap-reverse { flex-wrap: wrap-reverse; }`;
 
-  // -- MARGIN / SPACING UTILS --
+  // -- MARGIN / SPACING UTILITIES --
   const marginPrefixes = ['m', 'mx', 'my', 'ms', 'me', 'mt', 'mr', 'mb', 'ml'];
   const marginCssProps = {
     m: 'margin',
@@ -340,7 +364,7 @@ function generateCssForClass(className) {
     }
   }
 
-  // -- PADDING UTILS --
+  // -- PADDING UTILITIES --
   const paddingPrefixes = ['p', 'px', 'py', 'ps', 'pe', 'pt', 'pr', 'pb', 'pl'];
   const paddingCssProps = {
     p: 'padding',
@@ -360,7 +384,7 @@ function generateCssForClass(className) {
     }
   }
 
-  // -- SPACE UTILS --
+  // -- SPACE UTILITIES --
   if (className.startsWith('space-x-')) {
     let rule = generateSpaceRule(className, 'x');
     if (rule) return rule;
@@ -380,7 +404,7 @@ function generateCssForClass(className) {
   if (className === 'min-w-full') return `.min-w-full { min-width: 100%; }`;
   if (className === 'min-h-full') return `.min-h-full { min-height: 100%; }`;
 
-  // Justify mappings.
+  // -- JUSTIFY, ALIGN & SELF UTILITIES --
   const justifyMapping = {
     'justify-start': 'flex-start',
     'justify-end': 'flex-end',
@@ -395,7 +419,6 @@ function generateCssForClass(className) {
   if (justifyMapping[className])
     return `.${className} { justify-content: ${justifyMapping[className]}; }`;
 
-  // Items mappings.
   const itemsMapping = {
     'items-start': 'flex-start',
     'items-end': 'flex-end',
@@ -403,9 +426,9 @@ function generateCssForClass(className) {
     'items-baseline': 'baseline',
     'items-stretch': 'stretch',
   };
-  if (itemsMapping[className]) return `.${className} { align-items: ${itemsMapping[className]}; }`;
+  if (itemsMapping[className])
+    return `.${className} { align-items: ${itemsMapping[className]}; }`;
 
-  // Self mappings.
   const selfMapping = {
     'self-auto': 'auto',
     'self-start': 'flex-start',
@@ -414,18 +437,22 @@ function generateCssForClass(className) {
     'self-stretch': 'stretch',
     'self-baseline': 'baseline',
   };
-  if (selfMapping[className]) return `.${className} { align-self: ${selfMapping[className]}; }`;
+  if (selfMapping[className])
+    return `.${className} { align-self: ${selfMapping[className]}; }`;
 
   // -- WIDTH, HEIGHT, BACKGROUND, GAP, etc. --
   if (className === 'w-full') return `.w-full { width: 100%; }`;
   match = className.match(/^w-\[(.+?)\]$/);
-  if (match) return `.${escapeClassName(className)} { width: ${match[1].replace(/_/g, ' ')}; }`;
+  if (match)
+    return `.${escapeClassName(className)} { width: ${match[1].replace(/_/g, ' ')}; }`;
 
   match = className.match(/^h-\[(.+?)\]$/);
-  if (match) return `.${escapeClassName(className)} { height: ${match[1].replace(/_/g, ' ')}; }`;
+  if (match)
+    return `.${escapeClassName(className)} { height: ${match[1].replace(/_/g, ' ')}; }`;
 
   match = className.match(/^max-w-\[(.+?)\]$/);
-  if (match) return `.${escapeClassName(className)} { max-width: ${match[1].replace(/_/g, ' ')}; }`;
+  if (match)
+    return `.${escapeClassName(className)} { max-width: ${match[1].replace(/_/g, ' ')}; }`;
 
   match = className.match(/^max-h-\[(.+?)\]$/);
   if (match)
@@ -440,10 +467,12 @@ function generateCssForClass(className) {
     'bg-green-500': '#48bb78',
     'bg-yellow-500': '#ecc94b',
   };
-  if (bgColorMap[className]) return `.${className} { background-color: ${bgColorMap[className]}; }`;
+  if (bgColorMap[className])
+    return `.${className} { background-color: ${bgColorMap[className]}; }`;
 
   match = className.match(/^gap-\[(.+?)\]$/);
-  if (match) return `.${escapeClassName(className)} { gap: ${match[1].replace(/_/g, ' ')}; }`;
+  if (match)
+    return `.${escapeClassName(className)} { gap: ${match[1].replace(/_/g, ' ')}; }`;
   const gapMapping = {
     'gap-0': '0px',
     'gap-1': '0.25rem',
@@ -457,7 +486,8 @@ function generateCssForClass(className) {
     'gap-9': '2.25rem',
     'gap-10': '2.5rem',
   };
-  if (gapMapping[className]) return `.${className} { gap: ${gapMapping[className]}; }`;
+  if (gapMapping[className])
+    return `.${className} { gap: ${gapMapping[className]}; }`;
 
   return null;
 }
@@ -465,31 +495,40 @@ function generateCssForClass(className) {
 // ------------------------------
 // MAIN PROCESS
 // ------------------------------
-const files = globSync(pattern);
-files.forEach((file) => {
-  try {
-    const content = fs.readFileSync(file, 'utf8');
-    extractClasses(content);
-    extractPredefinedClasses(content);
-    extractAdditionalClasses(content);
-    if (path.extname(file) === '.scss') {
-      extractApplyClasses(content);
+
+/**
+ * Main function that processes files in the target directory,
+ * extracts Tailwind-like classes, and generates the CSS file.
+ */
+function main() {
+  const files = globSync(pattern);
+  files.forEach((file) => {
+    try {
+      const content = fs.readFileSync(file, 'utf8');
+      extractClasses(content);
+      extractPredefinedClasses(content);
+      extractAdditionalClasses(content);
+      if (path.extname(file) === '.scss') {
+        extractApplyClasses(content);
+      }
+    } catch (error) {
+      console.error('Error reading file:', file, error);
     }
-  } catch (error) {
-    console.error('Error reading file:', file, error);
-  }
-});
+  });
 
-const cssRules = [];
-classSet.forEach((cls) => {
-  const rule = generateCssForClass(cls);
-  if (rule) cssRules.push(rule);
-});
+  const cssRules = [];
+  classSet.forEach((cls) => {
+    const rule = generateCssForClass(cls);
+    if (rule) cssRules.push(rule);
+  });
 
-// Prepend a :root rule to define --spacing.
-const rootRule = `:root { --spacing: 1px; }`;
+  // Prepend a :root rule to define --spacing.
+  const rootRule = `:root { --spacing: 1px; }`;
+  const outputCss = rootRule + '\n\n' + cssRules.join('\n\n');
 
-// Combine the root rule with all generated CSS rules.
-const outputCss = rootRule + '\n\n' + cssRules.join('\n\n');
-fs.writeFileSync(outputCssFile, outputCss, 'utf8');
-console.log(`CSS file generated: ${outputCssFile}`);
+  fs.writeFileSync(outputCssFile, outputCss, 'utf8');
+  console.log(`CSS file generated: ${outputCssFile}`);
+}
+
+// Execute the main process.
+main();
