@@ -1,0 +1,27 @@
+{
+  "name": "@ngnomads/tailwind2css",
+  "version": "0.0.1",
+  "description": "Tool to Migrate from Tailwind classes to css",
+  "main": "./src/tailwind2css.js",
+  "homepage": "https://github.com/bharathmuppa/tailwind2css/blob/main/README.md",
+  "scripts": {
+    "test": "node ./src/tailwind2css.js "
+  },
+  "bin": {
+    "ngflex2tailwind": "./src/tailwind2css.js"
+  },
+  "keywords": [
+    "Angular Flex Layout",
+    "Angular",
+    "Tailwind",
+    "CSS"
+  ],
+  "author": "bharathmuppa",
+  "license": "ISC",
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "glob": "^11.0.1"
+  }
+}
