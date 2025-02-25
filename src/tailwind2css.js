@@ -18,14 +18,15 @@
 // ------------------------------
 const fs = require('fs');
 const path = require('path');
-const {sync: globSync} = require('glob');
+const { sync: globSync } = require('glob');
 
 // ------------------------------
 // CONFIGURATION
 // ------------------------------
 const targetDir = process.argv[2] || 'projects';
 const outputCssFile = process.argv[3] || './tailwind.css';
-const pattern = path.join(targetDir, '**/*.{html,ts,scss}');
+// Use path.join to build the pattern then convert backslashes to forward slashes for cross-platform compatibility.
+const pattern = path.join(targetDir, '**/*.{html,ts,scss}').replace(/\\/g, '/');
 const classSet = new Set(); // Set to store unique Tailwind-like class names
 
 // ------------------------------
