@@ -25,7 +25,8 @@ const { sync: globSync } = require('glob');
 // ------------------------------
 const targetDir = process.argv[2] || 'projects';
 const outputCssFile = process.argv[3] || './tailwind.css';
-// Use path.join to build the pattern then convert backslashes to forward slashes for cross-platform compatibility.
+// Use path.join to build the pattern, then convert backslashes to forward slashes for cross-platform compatibility.
+// The glob library expects forward slashes in patterns, even on Windows.
 const pattern = path.join(targetDir, '**/*.{html,ts,scss}').replace(/\\/g, '/');
 const classSet = new Set(); // Set to store unique Tailwind-like class names
 
@@ -65,7 +66,7 @@ function extractClasses(content) {
  */
 function extractPredefinedClasses(content) {
   const tailwindRegex =
-    /\b(?:flex(?:-\[[^\]]+\]|-\d+(?:\/\d+)?|-\(.+?\))?|flex-row|flex-col|flex-wrap|flex-nowrap|flex-wrap-reverse|w-full|h-full|min-w-full|min-h-full|max-w-\[[^\]]+\]|max-h-\[[^\]]+\]|w-\[[^\]]+\]|h-\[[^\]]+\]|bg-\[[^\]]+\]|bg-[a-z]+-[0-9]{1,4}|gap-\[[^\]]+\]|gap-[0-9]+|box-border|justify-(?:start|end|center|between|around|evenly|stretch|baseline|normal)|items-(?:start|end|center|baseline|stretch)|self-(?:auto|start|end|center|stretch|baseline)|flex-auto|flex-initial|flex-none)\b/g;
+    /\b(?:grid(?:-cols-\d+|-rows-\d+|-flow-(?:row|col|dense|row-dense|col-dense))?|col-(?:span-(?:\d+|full)|start-(?:\d+|auto)|end-(?:\d+|auto)|auto)|row-(?:span-(?:\d+|full)|start-(?:\d+|auto)|end-(?:\d+|auto)|auto)|auto-(?:cols|rows)-(?:auto|min|max|fr)|flex(?:-\[[^\]]+\]|-\d+(?:\/\d+)?|-\(.+?\))?|flex-row|flex-col|flex-wrap|flex-nowrap|flex-wrap-reverse|w-full|h-full|min-w-full|min-h-full|max-w-\[[^\]]+\]|max-h-\[[^\]]+\]|w-\[[^\]]+\]|h-\[[^\]]+\]|bg-\[[^\]]+\]|bg-[a-z]+-[0-9]{1,4}|gap-\[[^\]]+\]|gap-[0-9]+|box-border|justify-(?:start|end|center|between|around|evenly|stretch|baseline|normal)|items-(?:start|end|center|baseline|stretch)|self-(?:auto|start|end|center|stretch|baseline)|flex-auto|flex-initial|flex-none)\b/g;
   let match;
   while ((match = tailwindRegex.exec(content)) !== null) {
     classSet.add(match[0]);
@@ -324,13 +325,134 @@ function generateSpaceRule(className, axis) {
  * @returns {string|null} The generated CSS rule, or null if no rule applies.
  */
 function generateCssForClass(className) {
+  // -- GRID DISPLAY --
+  if (className === 'grid') return `.grid { display: grid; }`;
+
+  // -- GRID TEMPLATE COLUMNS --
+  let match;
+  match = className.match(/^grid-cols-(\d+)$/);
+  if (match) return `.${escapeClassName(className)} { grid-template-columns: repeat(${match[1]}, minmax(0, 1fr)); }`;
+  if (className === 'grid-cols-none') return `.grid-cols-none { grid-template-columns: none; }`;
+  if (className === 'grid-cols-subgrid') return `.grid-cols-subgrid { grid-template-columns: subgrid; }`;
+  match = className.match(/^grid-cols-\[(.+?)\]$/);
+  if (match) return `.${escapeClassName(className)} { grid-template-columns: ${match[1].replace(/_/g, ' ')}; }`;
+  match = className.match(/^grid-cols-\((.+?)\)$/);
+  if (match) return `.${escapeClassName(className)} { grid-template-columns: var(${match[1]}); }`;
+
+  // -- GRID TEMPLATE ROWS --
+  match = className.match(/^grid-rows-(\d+)$/);
+  if (match) return `.${escapeClassName(className)} { grid-template-rows: repeat(${match[1]}, minmax(0, 1fr)); }`;
+  if (className === 'grid-rows-none') return `.grid-rows-none { grid-template-rows: none; }`;
+  if (className === 'grid-rows-subgrid') return `.grid-rows-subgrid { grid-template-rows: subgrid; }`;
+  match = className.match(/^grid-rows-\[(.+?)\]$/);
+  if (match) return `.${escapeClassName(className)} { grid-template-rows: ${match[1].replace(/_/g, ' ')}; }`;
+  match = className.match(/^grid-rows-\((.+?)\)$/);
+  if (match) return `.${escapeClassName(className)} { grid-template-rows: var(${match[1]}); }`;
+
+  // -- GRID COLUMN SPAN --
+  match = className.match(/^col-span-(\d+)$/);
+  if (match) return `.${escapeClassName(className)} { grid-column: span ${match[1]} / span ${match[1]}; }`;
+  if (className === 'col-span-full') return `.col-span-full { grid-column: 1 / -1; }`;
+  match = className.match(/^col-span-\[(.+?)\]$/);
+  if (match) return `.${escapeClassName(className)} { grid-column: span ${match[1].replace(/_/g, ' ')} / span ${match[1].replace(/_/g, ' ')}; }`;
+
+  // -- GRID COLUMN START --
+  match = className.match(/^col-start-(\d+)$/);
+  if (match) return `.${escapeClassName(className)} { grid-column-start: ${match[1]}; }`;
+  match = className.match(/^-col-start-(\d+)$/);
+  if (match) return `.${escapeClassName(className)} { grid-column-start: -${match[1]}; }`;
+  if (className === 'col-start-auto') return `.col-start-auto { grid-column-start: auto; }`;
+  match = className.match(/^col-start-\[(.+?)\]$/);
+  if (match) return `.${escapeClassName(className)} { grid-column-start: ${match[1].replace(/_/g, ' ')}; }`;
+
+  // -- GRID COLUMN END --
+  match = className.match(/^col-end-(\d+)$/);
+  if (match) return `.${escapeClassName(className)} { grid-column-end: ${match[1]}; }`;
+  match = className.match(/^-col-end-(\d+)$/);
+  if (match) return `.${escapeClassName(className)} { grid-column-end: -${match[1]}; }`;
+  if (className === 'col-end-auto') return `.col-end-auto { grid-column-end: auto; }`;
+  match = className.match(/^col-end-\[(.+?)\]$/);
+  if (match) return `.${escapeClassName(className)} { grid-column-end: ${match[1].replace(/_/g, ' ')}; }`;
+
+  // -- GRID COLUMN (SHORTHAND) --
+  if (className === 'col-auto') return `.col-auto { grid-column: auto; }`;
+  match = className.match(/^col-(\d+)$/);
+  if (match) return `.${escapeClassName(className)} { grid-column: ${match[1]}; }`;
+  match = className.match(/^-col-(\d+)$/);
+  if (match) return `.${escapeClassName(className)} { grid-column: -${match[1]}; }`;
+  match = className.match(/^col-\[(.+?)\]$/);
+  if (match) return `.${escapeClassName(className)} { grid-column: ${match[1].replace(/_/g, ' ')}; }`;
+  match = className.match(/^col-\((.+?)\)$/);
+  if (match) return `.${escapeClassName(className)} { grid-column: var(${match[1]}); }`;
+
+  // -- GRID ROW SPAN --
+  match = className.match(/^row-span-(\d+)$/);
+  if (match) return `.${escapeClassName(className)} { grid-row: span ${match[1]} / span ${match[1]}; }`;
+  if (className === 'row-span-full') return `.row-span-full { grid-row: 1 / -1; }`;
+  match = className.match(/^row-span-\[(.+?)\]$/);
+  if (match) return `.${escapeClassName(className)} { grid-row: span ${match[1].replace(/_/g, ' ')} / span ${match[1].replace(/_/g, ' ')}; }`;
+
+  // -- GRID ROW START --
+  match = className.match(/^row-start-(\d+)$/);
+  if (match) return `.${escapeClassName(className)} { grid-row-start: ${match[1]}; }`;
+  match = className.match(/^-row-start-(\d+)$/);
+  if (match) return `.${escapeClassName(className)} { grid-row-start: -${match[1]}; }`;
+  if (className === 'row-start-auto') return `.row-start-auto { grid-row-start: auto; }`;
+  match = className.match(/^row-start-\[(.+?)\]$/);
+  if (match) return `.${escapeClassName(className)} { grid-row-start: ${match[1].replace(/_/g, ' ')}; }`;
+
+  // -- GRID ROW END --
+  match = className.match(/^row-end-(\d+)$/);
+  if (match) return `.${escapeClassName(className)} { grid-row-end: ${match[1]}; }`;
+  match = className.match(/^-row-end-(\d+)$/);
+  if (match) return `.${escapeClassName(className)} { grid-row-end: -${match[1]}; }`;
+  if (className === 'row-end-auto') return `.row-end-auto { grid-row-end: auto; }`;
+  match = className.match(/^row-end-\[(.+?)\]$/);
+  if (match) return `.${escapeClassName(className)} { grid-row-end: ${match[1].replace(/_/g, ' ')}; }`;
+
+  // -- GRID ROW (SHORTHAND) --
+  if (className === 'row-auto') return `.row-auto { grid-row: auto; }`;
+  match = className.match(/^row-(\d+)$/);
+  if (match) return `.${escapeClassName(className)} { grid-row: ${match[1]}; }`;
+  match = className.match(/^-row-(\d+)$/);
+  if (match) return `.${escapeClassName(className)} { grid-row: -${match[1]}; }`;
+  match = className.match(/^row-\[(.+?)\]$/);
+  if (match) return `.${escapeClassName(className)} { grid-row: ${match[1].replace(/_/g, ' ')}; }`;
+  match = className.match(/^row-\((.+?)\)$/);
+  if (match) return `.${escapeClassName(className)} { grid-row: var(${match[1]}); }`;
+
+  // -- GRID AUTO-FLOW --
+  if (className === 'grid-flow-row') return `.grid-flow-row { grid-auto-flow: row; }`;
+  if (className === 'grid-flow-col') return `.grid-flow-col { grid-auto-flow: column; }`;
+  if (className === 'grid-flow-dense') return `.grid-flow-dense { grid-auto-flow: dense; }`;
+  if (className === 'grid-flow-row-dense') return `.grid-flow-row-dense { grid-auto-flow: row dense; }`;
+  if (className === 'grid-flow-col-dense') return `.grid-flow-col-dense { grid-auto-flow: column dense; }`;
+
+  // -- GRID AUTO-COLUMNS --
+  if (className === 'auto-cols-auto') return `.auto-cols-auto { grid-auto-columns: auto; }`;
+  if (className === 'auto-cols-min') return `.auto-cols-min { grid-auto-columns: min-content; }`;
+  if (className === 'auto-cols-max') return `.auto-cols-max { grid-auto-columns: max-content; }`;
+  if (className === 'auto-cols-fr') return `.auto-cols-fr { grid-auto-columns: minmax(0, 1fr); }`;
+  match = className.match(/^auto-cols-\[(.+?)\]$/);
+  if (match) return `.${escapeClassName(className)} { grid-auto-columns: ${match[1].replace(/_/g, ' ')}; }`;
+  match = className.match(/^auto-cols-\((.+?)\)$/);
+  if (match) return `.${escapeClassName(className)} { grid-auto-columns: var(${match[1]}); }`;
+
+  // -- GRID AUTO-ROWS --
+  if (className === 'auto-rows-auto') return `.auto-rows-auto { grid-auto-rows: auto; }`;
+  if (className === 'auto-rows-min') return `.auto-rows-min { grid-auto-rows: min-content; }`;
+  if (className === 'auto-rows-max') return `.auto-rows-max { grid-auto-rows: max-content; }`;
+  if (className === 'auto-rows-fr') return `.auto-rows-fr { grid-auto-rows: minmax(0, 1fr); }`;
+  match = className.match(/^auto-rows-\[(.+?)\]$/);
+  if (match) return `.${escapeClassName(className)} { grid-auto-rows: ${match[1].replace(/_/g, ' ')}; }`;
+  match = className.match(/^auto-rows-\((.+?)\)$/);
+  if (match) return `.${escapeClassName(className)} { grid-auto-rows: var(${match[1]}); }`;
+
   // -- FLEX UTILITIES --
   if (className === 'flex') return `.flex { display: flex; }`;
   if (className === 'flex-auto') return `.flex-auto { flex: 1 1 auto; }`;
   if (className === 'flex-initial') return `.flex-initial { flex: 0 1 auto; }`;
   if (className === 'flex-none') return `.flex-none { flex: none; }`;
-
-  let match;
   match = className.match(/^flex-(\d+)$/);
   if (match) return `.${escapeClassName(className)} { flex: ${match[1]}; }`;
   match = className.match(/^flex-(\d+\/\d+)$/);
@@ -502,7 +624,10 @@ function generateCssForClass(className) {
  * extracts Tailwind-like classes, and generates the CSS file.
  */
 function main() {
-  const files = globSync(pattern);
+  console.log(`Scanning pattern: ${pattern}`);
+  const files = globSync(pattern, { windowsPathsNoEscape: true });
+  console.log(`Found ${files.length} files to process`);
+
   files.forEach((file) => {
     try {
       const content = fs.readFileSync(file, 'utf8');
@@ -517,11 +642,15 @@ function main() {
     }
   });
 
+  console.log(`Extracted ${classSet.size} unique classes`);
+
   const cssRules = [];
   classSet.forEach((cls) => {
     const rule = generateCssForClass(cls);
     if (rule) cssRules.push(rule);
   });
+
+  console.log(`Generated ${cssRules.length} CSS rules`);
 
   // Prepend a :root rule to define --spacing.
   const rootRule = `:root { --spacing: 1px; }`;

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Grid Layout Sample</title>
+</head>
+<body>
+    <!-- Basic Grid -->
+    <div class="grid grid-cols-3 grid-rows-2 gap-4 p-4">
+        <div class="col-span-2 p-2">Spans 2 columns</div>
+        <div class="row-span-2 p-2">Spans 2 rows</div>
+        <div class="p-2">Regular item</div>
+        <div class="p-2">Regular item</div>
+    </div>
+
+    <!-- Grid with positioning -->
+    <div class="grid grid-cols-4 gap-2 m-4">
+        <div class="col-start-1 col-end-3 p-3">Col 1 to 3</div>
+        <div class="col-span-full p-3">Full width</div>
+        <div class="col-auto p-3">Auto</div>
+    </div>
+
+    <!-- Grid with row positioning -->
+    <div class="grid grid-rows-3 gap-3 p-6">
+        <div class="row-start-1 row-end-3 px-2 py-4">Row 1 to 3</div>
+        <div class="row-span-full px-4 py-2">Full height</div>
+        <div class="row-auto px-3 py-3">Auto</div>
+    </div>
+
+    <!-- Grid with auto-flow -->
+    <div class="grid grid-cols-2 grid-flow-row gap-4 auto-cols-auto">
+        <div class="p-2 m-1">Item 1</div>
+        <div class="p-2 m-1">Item 2</div>
+        <div class="p-2 m-1">Item 3</div>
+    </div>
+
+    <!-- Grid with auto sizing -->
+    <div class="grid auto-cols-fr auto-rows-min gap-6">
+        <div class="col-span-3 p-4">Three columns wide</div>
+        <div class="row-span-2 p-4">Two rows tall</div>
+    </div>
+
+    <!-- Complex grid layout -->
+    <div class="grid grid-cols-4 grid-rows-3 gap-2 grid-flow-col">
+        <div class="col-span-2 row-span-2 p-3 m-2">Large item</div>
+        <div class="col-start-3 col-end-5 p-2 m-1">Wide item</div>
+        <div class="row-start-2 row-end-4 p-2 m-1">Tall item</div>
+    </div>
+</body>
+</html>
